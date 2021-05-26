@@ -4,11 +4,13 @@
 import tensorflow as tf
 import matplotlib.pyplot as plot
 import numpy as np
+import os
 
 from tensorflow import keras
 from tensorflow.keras import preprocessing
 from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import load_model
 
 from tensorflow.keras.preprocessing import image_dataset_from_directory
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
@@ -56,6 +58,9 @@ test_ds = image_dataset_from_directory(
     shuffle=True,
     seed=None
 )
+test, test_info = test_ds.take(1)
+fig= tf.data.Dataset.show_examples(test,test_info)
+fig.show()
 
 #test_multiple_ds = image_dataset_from_directory(
 #    directory='fruits-360/test-multiple-fruits',
@@ -67,17 +72,51 @@ test_ds = image_dataset_from_directory(
 #)
 
 class_names = train_ds.class_names
+#classes = train_ds.classes
+#print(classes)
 print(class_names)
+print(len(class_names))
 
-plot.figure(figsize=(img_size, img_size))
-for images, labels in train_ds.take(1):
-  for i in range(9):
-    ax = plot.subplot(3, 3, i + 1)
-    plot.imshow(images[i].numpy().astype("uint8"))
-    plot.title(class_names[i].title())
-    plot.axis("off")
-plot.show()
+if(os.stat("model.h5").st_size==0) : # construct model of CNN
+    model = Sequential([
+    layers.experimental.preprocessing.Rescaling(1./255),
+    layers.Conv2D(16,3,activation = 'relu'),
+    layers.MaxPool2D(),
+    layers.Conv2D(32,3,activation = 'relu'),
+    layers.MaxPool2D(),
+    layers.Conv2D(64,3,activation = 'relu'),
+    layers.MaxPool2D(),
+    layers.Conv2D(128,3,activation = 'relu'),
+    layers.MaxPool2D(),
+    layers.Flatten(),
+    layers.Dense(1024,activation='relu'),
+    layers.Dense(512,activation='relu'),
+    layers.Dense(len(class_names),activation = 'softmax')
+    ])
+    model.compile(loss = 'categorical_crossentropy',
+                optimizer='adam', metrics =['accuracy']) 
+    history =model.fit(
+    train_ds,
+    validation_data = valid_ds,
+    epochs = 3
+    )
+    model.summary()   
+    model.save("model.h5")    #save trained model to file 
+else :
+    model = load_model('model.h5')
+    
+    predictions=model.predict(test_ds)
+    predict, predict_info = predictions.take(1)
 
-train_ds = train_ds.map(process) # normalization
-
-
+    fig= tf.data.Dataset.show_examples(predict,predict_info)
+    fig.show()
+    #i=0
+    
+    #plot.figure(figsize = (30, 30))
+    #for images,  in predictions.take(1):
+    #    image, label = images["image"],images["label"]
+    #    plot.subplot(9,5, i + 1)
+    #    plot.xlabel(label.numpy())
+    #    plot.imshow(image.numpy()[:,:,0].astype(np.float32))
+    #    i=i+1
+    #plot.show()
